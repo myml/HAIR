@@ -3461,15 +3461,16 @@ class TestRemotesGhostTileIsAlwaysCompact:
         assert "this.spanFull" not in text
 
     def test_remotes_carries_no_full_layout_copy(self):
-        """The remaining held English on the Remotes side was
-        unreachable rather than wrong, which is exactly how it came back
-        the first time: a string nothing renders is a string nobody
-        redlines, waiting for a consumer to reach it. Deleted, so a
-        future full-layout Remotes tile has to ask for its copy."""
+        """The full layout's title and long hint stay Devices-only: the
+        Remotes grid is never truly empty, so nothing Remotes renders
+        can reach them, and a string nothing renders is a string nobody
+        redlines -- which is exactly how the held English came back the
+        first time. The keys are declared on the Devices entry alone, so
+        a future full-layout Remotes tile has to ask for its copy."""
         text = _read("ir-ghost-tile.ts")
         remote = text.split("    remote: {")[1].split("};")[0]
-        assert "title:" not in remote
-        assert "hintFull:" not in remote
+        assert "titleKey:" not in remote
+        assert "hintFullKey:" not in remote
 
     def test_a_remotes_tile_handed_empty_renders_compact(self):
         """The component decides the layout now, rather than trusting
@@ -3482,7 +3483,7 @@ class TestRemotesGhostTileIsAlwaysCompact:
 
     def test_the_compact_hint_is_still_the_localized_one(self):
         """The layout the user now always sees is the redlined one, and
-        it reads through t() in all ten dictionaries."""
+        it reads through t() in all eleven dictionaries."""
         text = _read("ir-ghost-tile.ts")
         assert "${t(copy.hintCompactKey)}" in text
         for name in LOCALE_NAMES:
@@ -3491,6 +3492,124 @@ class TestRemotesGhostTileIsAlwaysCompact:
             )
             assert data["ghost.hint_compact_remote"]
             assert data["ghost.hint_compact_device"]
+
+
+class TestNoHeldEnglishIsLeftInTheGhostTile:
+    """The hold on the tile's remaining copy is lifted.
+
+    add-popups-signpost-2-coding-plan.md section 0.5 held the phrasing
+    out of ``t()`` "pending the owner's bench redline, so that a stale
+    translation could not ship ahead of the English it was translated
+    from", and the redline only ever arrived for the compact hint, so
+    the title, the long hint and the aria label stayed hardcoded
+    English. The owner then met them live: the zero-devices Devices
+    tile is the empty state of a fresh install, and the aria label is on
+    the tile's ``title`` and ``aria-label``, so it appears on hover and
+    to a screen reader at EVERY device count. Four strings that no test
+    could see and no dictionary could reach, which is the opposite of
+    what a hold is for.
+
+    These tests fail against the held-English version of the file: the
+    first on the literal, the rest on the keys being absent.
+    """
+
+    #: The exact held strings. Their presence anywhere in the component
+    #: means a repeat of the same mistake, whatever route it arrives by.
+    HELD = (
+        "Add a Device",
+        "Drag a Wig, SmartIR, Flipper, LIRC, or Girr file here, or click to add",
+        "Add Device -- or drop a Wig, SmartIR, Flipper, LIRC, or Girr file",
+        "Add Remote -- or drop a Wig, SmartIR, Flipper, LIRC, or Girr file",
+    )
+
+    #: Third-party file formats this tile accepts. Product names, held
+    #: verbatim in every dictionary -- unlike ``Wig``, which is HAIR's
+    #: own word for a code set and is translated where a language has a
+    #: better one.
+    FORMATS = ("SmartIR", "Flipper", "LIRC", "Girr")
+
+    def test_the_held_english_is_gone_from_the_component(self):
+        text = _read("ir-ghost-tile.ts")
+        for held in self.HELD:
+            assert held not in text, f"held English is back: {held!r}"
+
+    def test_every_rendered_string_is_a_dictionary_key(self):
+        """``COPY`` holds keys, not copy: a literal here would render
+        English in every language while looking localized at the call
+        site."""
+        text = _read("ir-ghost-tile.ts")
+        assert "${t(copy.ariaKey)}" in text
+        assert "${t(copy.titleKey as string)}" in text
+        assert "${t(copy.hintFullKey as string)}" in text
+        # aria drives BOTH the label and the hover tooltip.
+        assert "aria-label=${t(copy.ariaKey)}" in text
+        assert "title=${t(copy.ariaKey)}" in text
+        assert "copy.aria}" not in text
+        assert "copy.title}" not in text
+        assert "copy.hintFull}" not in text
+
+    def test_the_promoted_keys_exist_in_every_dictionary(self):
+        """A promoted string has to land in all eleven at once: the
+        parity test would catch a missing one, but only after someone
+        else's CI run, and this is the file that owns the decision."""
+        promoted = (
+            "ghost.title_device",
+            "ghost.hint_full_device",
+            "ghost.aria_add_device",
+            "ghost.aria_add_remote",
+            "alias.signal_short",
+        )
+        for name in LOCALE_NAMES:
+            data = json.loads(
+                (LOCALES / f"{name}.json").read_text(encoding="utf-8")
+            )
+            for key in promoted:
+                assert data.get(key), f"{name}.json: {key} missing or empty"
+
+    def test_the_aria_keeps_the_file_formats_and_the_verb_phrase(self):
+        """The aria label is the one string a screen-reader user hears
+        at every device count, so its format list is the last place a
+        translator should be shortening anything."""
+        for name in LOCALE_NAMES:
+            data = json.loads(
+                (LOCALES / f"{name}.json").read_text(encoding="utf-8")
+            )
+            for key in ("ghost.aria_add_device", "ghost.aria_add_remote"):
+                value = data[key]
+                for fmt in self.FORMATS:
+                    assert fmt in value, f"{name}.json: {key} lost {fmt}"
+                # Leading verb phrase survived: the file list is never
+                # the whole string. Checked as "something precedes the
+                # first format word", since the phrase is translated.
+                first = min(value.index(fmt) for fmt in self.FORMATS)
+                assert first > 0, f"{name}.json: {key} is only the file list"
+                # Break between the halves is the language's own dash,
+                # not a dropped connector: an ASCII -- pair in English
+                # and the nine, an em-dash pair in Chinese.
+                assert "--" in value or "——" in value, (
+                    f"{name}.json: {key} lost its dash break: {value!r}"
+                )
+
+    def test_the_code_set_noun_is_either_wig_or_its_translation(self):
+        """``Wig`` is the one word in these strings a locale MAY
+        translate, and pinning it English here would contradict the
+        Chinese dictionary's own decision (码组). The list that may never
+        move is ``BRAND_NAMES`` in test_locales.py -- HAIR, Sniffer,
+        Clipper, Plucker, Mirror, Tweezer -- and Wig is deliberately not
+        on it: it names a feature, not a product or a format, which is
+        why ``SmartIR``, ``Flipper``, ``LIRC`` and ``Girr`` are held
+        verbatim above and this one is not."""
+        for name in LOCALE_NAMES:
+            data = json.loads(
+                (LOCALES / f"{name}.json").read_text(encoding="utf-8")
+            )
+            for key in ("ghost.hint_full_device", "ghost.aria_add_device"):
+                value = data[key]
+                assert "Wig" in value or "码组" in value, (
+                    f"{name}.json: {key} names no code set at all: {value!r}"
+                )
+
+
 class TestTheGhostDropAnswersAReverseSupersession:
     """R3 (issue 11, owner ruled 2026-08-30).
 

@@ -35,9 +35,7 @@
  * Remotes is compact always; `spanFull` retired with the layout, since
  * Devices only ever passed it together with `empty`.
  *
- * COPY: the COMPACT HINT is redlined and localized; the Devices full
- * layout's title and hint are still held. Remotes carries neither,
- * because it has no layout that could show them.
+ * COPY: every string this tile renders now reads through `t()`.
  *
  * add-popups-signpost-2-coding-plan.md's carry-forward note (section
  * 0.5, restated for signpost 3) ruled the ghost tile's structure and
@@ -46,12 +44,25 @@
  * ahead of the English it was translated from. The redline arrived for
  * the compact hint alone (ghost-tile-redesign-handoff.md, owner-
  * approved 2026-08-16, punch list item 14), which is why exactly one
- * string moved: `hintCompact` now reads through `t()` in ten
- * dictionaries. The title, the long hint and the aria label are still
- * awaiting their own redline and stay hardcoded English on purpose --
- * promote them when they are ruled, not before. The zero-devices case
- * that shows them is rarer than the Remotes one ever was: a HAIR
- * install with no Devices at all.
+ * string moved first: `hintCompact` read through `t()` in ten
+ * dictionaries while the title, the long hint and the aria label
+ * stayed hardcoded English, waiting for their own redline.
+ *
+ * THE WAIT IS OVER, AND THE HOLD WAS THE WRONG TEST. The owner saw the
+ * held copy live -- the zero-devices Devices tile, which is exactly the
+ * "a fresh install read held English" complaint that retired the
+ * Remotes fuller layout in 0.10.1 item 6 -- and the aria label turned
+ * out to be the worse half: it is on the tile's `title` and
+ * `aria-label`, so it surfaces on hover and to a screen reader at
+ * EVERY device count, not only at zero. The hold's own rationale was
+ * "promote them when they are ruled, not before", and an untranslated
+ * string is not made safe by being unruled; it is made invisible to
+ * the translators who would notice it. Two of the four strings were
+ * never reachable in the Remotes case the hold was written around, and
+ * the Devices zero-devices case is the one a new user meets first.
+ *
+ * There is no held English left in this file: `title`, `hintFull` and
+ * `aria` are keys now, in all eleven dictionaries.
  *
  * The compact hint's WORDING then went back (punch list item 22): the
  * owner saw the shortened "code-set file" phrasing live and took the
@@ -81,29 +92,29 @@ import { ORIGIN_COLORS } from "./ir-origin-colors.js";
 
 type GhostKind = "device" | "remote";
 
-// Held-back copy -- see file header. English only, on purpose.
-// `title` and `hintFull` belong to the full layout, which only the
-// Devices section can reach, so only Devices declares them and the
-// types say so. The compact hint every user sees is localized and read
-// through t() below.
+// Every string the tile renders is a dictionary key now -- see the file
+// header for why the hold on the last three was lifted. `titleKey` and
+// `hintFullKey` belong to the full layout, which only the Devices
+// section can reach, so only Devices declares them and the types say
+// so.
 const COPY: Record<
     GhostKind,
     {
-        title?: string;
-        hintFull?: string;
+        titleKey?: string;
+        hintFullKey?: string;
         hintCompactKey: string;
-        aria: string;
+        ariaKey: string;
     }
 > = {
     device: {
-        title: "Add a Device",
-        hintFull: "Drag a Wig, SmartIR, Flipper, LIRC, or Girr file here, or click to add",
+        titleKey: "ghost.title_device",
+        hintFullKey: "ghost.hint_full_device",
         hintCompactKey: "ghost.hint_compact_device",
-        aria: "Add Device -- or drop a Wig, SmartIR, Flipper, LIRC, or Girr file",
+        ariaKey: "ghost.aria_add_device",
     },
     remote: {
         hintCompactKey: "ghost.hint_compact_remote",
-        aria: "Add Remote -- or drop a Wig, SmartIR, Flipper, LIRC, or Girr file",
+        ariaKey: "ghost.aria_add_remote",
     },
 };
 
@@ -187,7 +198,7 @@ export class IrGhostTile extends LitElement {
         // landing on top of the first (F10).
         if (this.busy) {
             return html`
-                <div class=${classes} aria-busy="true" aria-label=${copy.aria}>
+                <div class=${classes} aria-busy="true" aria-label=${t(copy.ariaKey)}>
                     <span class="gt-spinner" aria-hidden="true"></span>
                     <div class="gt-tile-hint">${t("ghost.reading")}</div>
                 </div>
@@ -199,8 +210,8 @@ export class IrGhostTile extends LitElement {
                 class=${classes}
                 tabindex="0"
                 role="button"
-                aria-label=${copy.aria}
-                title=${copy.aria}
+                aria-label=${t(copy.ariaKey)}
+                title=${t(copy.ariaKey)}
                 @click=${this._onClick}
                 @keydown=${this._onKeydown}
                 @dragover=${this._onDragOver}
@@ -210,8 +221,8 @@ export class IrGhostTile extends LitElement {
                 ${full
                     ? html`
                           <span class="gt-plus-lg">+</span>
-                          <div class="gt-tile-title">${copy.title}</div>
-                          <div class="gt-tile-hint">${copy.hintFull}</div>
+                          <div class="gt-tile-title">${t(copy.titleKey as string)}</div>
+                          <div class="gt-tile-hint">${t(copy.hintFullKey as string)}</div>
                       `
                     : html`
                           <span class="gt-glyph">

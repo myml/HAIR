@@ -142,7 +142,7 @@ export class IrSignalAlias extends LitElement {
                               ><slot name="trailing"></slot></span
                           ></span
                       >`
-                    : html`<span class="signal-short-label">IR Signal</span
+                    : html`<span class="signal-short-label">${t("alias.signal_short")}</span
                           ><span
                               class="trailing"
                               @click=${(e: Event) => e.stopPropagation()}
